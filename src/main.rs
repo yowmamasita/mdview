@@ -50,24 +50,38 @@ KEYS:
     Ctrl/Cmd+/-/0 zoom               g / G       top / bottom
 ";
 
-/// Reattach to the console that launched us, if there was one.
+/// Reattach to the console that launched us, if we have no output and there was
+/// one.
 ///
-/// A `windows` subsystem binary starts with no standard handles, so `--help`,
-/// `--version` and `--print-html` would write into nothing when run from a
-/// terminal. Attaching to the parent's console restores them. Launched from
-/// Explorer there is no parent console, the call fails, and nothing is shown —
-/// which is the point.
+/// A `windows` subsystem binary is given no standard handles when it is started
+/// from Explorer, so `--help`, `--version` and `--print-html` would write into
+/// nothing. Attaching to the parent's console restores them.
+///
+/// The guard matters: `AttachConsole` *replaces* the standard handles with the
+/// console's. A shell that launched us already passed its own down — a pipe or
+/// a file when the caller redirected — and overwriting those breaks the
+/// redirection. So only attach when there is genuinely nothing there.
 #[cfg(windows)]
 fn attach_parent_console() {
     /// `ATTACH_PARENT_PROCESS`
     const PARENT: u32 = u32::MAX;
+    /// `STD_OUTPUT_HANDLE`
+    const STD_OUTPUT: u32 = -11i32 as u32;
+    /// `INVALID_HANDLE_VALUE`
+    const INVALID: isize = -1;
 
     // Provided by kernel32, which the MSVC target links by default.
     unsafe extern "system" {
-        fn AttachConsole(process_id: u32) -> i32;
+        fn GetStdHandle(std_handle: u32) -> isize;
+        fn AttachConsole(process_id: i32) -> i32;
     }
 
-    unsafe { AttachConsole(PARENT) };
+    unsafe {
+        let stdout = GetStdHandle(STD_OUTPUT);
+        if stdout == 0 || stdout == INVALID {
+            AttachConsole(PARENT as i32);
+        }
+    }
 }
 
 /// Nothing to do anywhere else.

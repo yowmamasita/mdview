@@ -229,16 +229,20 @@ jobs:
           }
           "subsystem $subsystem (GUI)"
 
-      # An arm64 binary cannot run on the x64 runner that produced it.
-      - name: Smoke test
+      # Redirection is the case that actually broke: `AttachConsole` replaces
+      # the standard handles, so a naive attach discards the pipe or file the
+      # shell handed down. Both shells are checked because they redirect
+      # differently.
+      - name: Smoke test redirection
         if: matrix.arch == 'x86_64'
         shell: pwsh
         run: |
-          # Redirected to a file rather than checked on the console: a GUI
-          # subsystem process only has standard handles when it is given them.
-          ./target/${{ matrix.target }}/release/mdview.exe --print-html README.md > out.html
-          if ((Get-Item out.html).Length -lt 1000) { throw "no output" }
-          "rendered $((Get-Item out.html).Length) bytes"
+          $exe = "target/${{ matrix.target }}/release/mdview.exe"
+          & $exe --print-html README.md > pwsh.html
+          if ((Get-Item pwsh.html).Length -lt 1000) { throw "pwsh redirect produced nothing" }
+          cmd /c "$exe --version > cmd.txt"
+          if ((Get-Item cmd.txt).Length -lt 5) { throw "cmd redirect produced nothing" }
+          "pwsh $((Get-Item pwsh.html).Length) bytes, cmd $((Get-Item cmd.txt).Length) bytes"
 
       - uses: actions/upload-artifact@v4
         with:
