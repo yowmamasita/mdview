@@ -161,6 +161,14 @@ pub fn run(options: Options) -> Result<(), Box<dyn Error>> {
                 ..
             } => *control_flow = ControlFlow::Exit,
 
+            // Finder does not pass a double-clicked file as an argument; it
+            // sends an open-document event once the application is running.
+            Event::Opened { urls } => {
+                if let Some(path) = first_markdown(&urls) {
+                    let _ = proxy.send_event(Action::Open(path));
+                }
+            }
+
             Event::UserEvent(action) => match action {
                 Action::Quit => *control_flow = ControlFlow::Exit,
 
@@ -349,6 +357,16 @@ fn on_navigate(url: &str, proxy: &EventLoopProxy<Action>) -> bool {
         let _ = proxy.send_event(Action::Navigated(path));
     }
     true
+}
+
+/// The first Markdown document among a set of opened URLs.
+///
+/// Only `file://` URLs mean anything to a viewer, and only one window exists, so
+/// opening several files at once shows the first that is Markdown.
+fn first_markdown(urls: &[url::Url]) -> Option<PathBuf> {
+    urls.iter()
+        .filter_map(|url| url.to_file_path().ok())
+        .find(|path| crate::is_markdown_path(path))
 }
 
 /// Window title: the file name, or just the application name.

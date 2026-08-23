@@ -22,7 +22,7 @@ path = "src/main.rs"
 [features]
 default = ["gui", "mermaid"]
 # Native window + system webview. Disable for a headless build (`--print-html` only).
-gui = ["dep:wry", "dep:tao", "dep:muda", "dep:rfd", "dep:notify", "dep:open"]
+gui = ["dep:wry", "dep:tao", "dep:muda", "dep:rfd", "dep:notify", "dep:open", "dep:url"]
 # Embed the Mermaid runtime so diagrams render with no network access.
 mermaid = []
 
@@ -42,6 +42,8 @@ muda = { version = "0.19.3", optional = true, default-features = false, features
 rfd = { version = "0.17.2", optional = true, default-features = false, features = ["xdg-portal", "common-controls-v6"] }
 notify = { version = "8.2.0", optional = true, default-features = false, features = ["macos_fsevent"] }
 open = { version = "5.4.1", optional = true }
+# Matches the version `tao` hands us in `Event::Opened`.
+url = { version = "2.5.8", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0.151"

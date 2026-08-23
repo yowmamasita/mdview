@@ -1260,6 +1260,7 @@ dependencies = [
  "rfd",
  "serde_json",
  "tao",
+ "url",
  "wry",
 ]
 

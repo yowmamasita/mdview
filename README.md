@@ -70,6 +70,40 @@ OPTIONS:
 Drop a file on the window to open it. Links to other Markdown files open in place;
 everything else opens in your browser.
 
+## Make it the default Markdown viewer
+
+### macOS
+
+Finder only offers *applications* as handlers, not bare executables, so this
+builds `mdview.app`, installs it, and claims the Markdown types:
+
+```sh
+scripts/bundle-macos.sh --install
+```
+
+That covers every extension in the list above — `.md`, `.markdown`, `.mkd`,
+`.rmd`, `.qmd` and the rest. Launch Services takes a few seconds to settle
+afterwards.
+
+To go back, right-click any `.md` file → *Get Info* → *Open with* → pick your
+previous editor → *Change All…*.
+
+Omit `--install` to build the bundle into `target/` without touching anything.
+
+### Linux
+
+```sh
+scripts/install-linux.sh
+```
+
+Installs to `~/.local` and sets the association with `xdg-mime` — no root
+needed.
+
+### Windows
+
+Right-click a `.md` file → *Open with* → *Choose another app* → browse to
+`mdview.exe` → check *Always use this app*.
+
 ### Keys
 
 | Key | Action |
@@ -100,6 +134,10 @@ stripped, on arm64 macOS. `cargo build --release --no-default-features --feature
 leaves it out.
 
 ## How it works
+
+When a file is opened from a file manager rather than the shell, macOS delivers
+it as an Apple Event rather than an argument; `tao`'s `Event::Opened` carries it,
+and it works whether the application was already running or not.
 
 The window is `tao`; the page is `wry` driving the platform webview. Everything
 the page loads — the document, its images, the stylesheet, the Mermaid runtime —

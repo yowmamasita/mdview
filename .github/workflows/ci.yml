@@ -53,3 +53,19 @@ jobs:
 
       - name: Test without the window
         run: cargo test --no-default-features
+
+      # The bundle is what lets macOS treat mdview as a document handler, so a
+      # broken packaging script should fail here rather than at install time.
+      - name: Build the macOS app bundle
+        if: runner.os == 'macOS'
+        run: |
+          scripts/bundle-macos.sh
+          plutil -lint target/mdview.app/Contents/Info.plist
+          test -f target/mdview.app/Contents/Resources/mdview.icns
+
+      - name: Check the Linux desktop entry
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y --no-install-recommends desktop-file-utils
+          desktop-file-validate packaging/linux/mdview.desktop
+          bash -n scripts/install-linux.sh

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=mdview
+GenericName=Markdown Viewer
+Comment=View Markdown documents
+Exec=mdview %f
+Icon=mdview
+Terminal=false
+Categories=Office;Viewer;Utility;
+MimeType=text/markdown;text/x-markdown;
+StartupWMClass=mdview
