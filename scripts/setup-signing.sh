@@ -56,19 +56,50 @@ fi
 echo "==> certificate: $identity"
 
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+scratch="$tmp/export.keychain"
+cleanup() {
+  security delete-keychain "$scratch" 2>/dev/null || true
+  rm -rf "$tmp"
+}
+trap cleanup EXIT
 chmod 700 "$tmp"
 
 # A throwaway password: the .p12 exists only long enough to be encoded, and the
 # same value is stored alongside it so the workflow can open it.
 p12_password=$(uuidgen)
 
-echo "==> exporting the certificate (your keychain will ask for permission)"
-security export -t identities -f pkcs12 -P "$p12_password" -o "$tmp/cert.p12" \
-  -T /usr/bin/codesign 2>/dev/null ||
-  security export -t identities -f pkcs12 -P "$p12_password" -o "$tmp/cert.p12"
+# `security export` has no way to select one identity — it takes everything in
+# the keychain, which here would also mean the Apple Development and Apple
+# Distribution certificates. Those have no business in a CI secret, so the
+# export is reloaded into a scratch keychain and pared back to the one identity
+# that signs releases.
+echo "==> exporting from your keychain (it will ask for permission)"
+security export -t identities -f pkcs12 -P "$p12_password" -o "$tmp/all.p12"
+[[ -s "$tmp/all.p12" ]] || { echo "the export produced nothing" >&2; exit 1; }
 
-[[ -s "$tmp/cert.p12" ]] || { echo "the export produced nothing" >&2; exit 1; }
+echo "==> narrowing to a single identity"
+security create-keychain -p "$p12_password" "$scratch"
+security unlock-keychain -p "$p12_password" "$scratch"
+security import "$tmp/all.p12" -k "$scratch" -P "$p12_password" -A >/dev/null
+
+before=$(security find-identity "$scratch" 2>/dev/null | grep -c '^ *[0-9]*)' || true)
+security find-identity "$scratch" 2>/dev/null |
+  sed -n 's/^ *[0-9]*) \([0-9A-F][0-9A-F]*\) "\([^"]*\)".*/\1|\2/p' |
+  while IFS='|' read -r hash name; do
+    [[ "$name" == "$identity" ]] && continue
+    security delete-identity -Z "$hash" "$scratch" >/dev/null 2>&1 &&
+      echo "  dropped $name"
+  done
+
+after=$(security find-identity "$scratch" 2>/dev/null | grep -c '^ *[0-9]*)' || true)
+if [[ "$after" != "1" ]]; then
+  echo "expected one identity to remain, found $after" >&2
+  exit 1
+fi
+echo "  kept 1 of $before"
+
+security export -k "$scratch" -t identities -f pkcs12 -P "$p12_password" -o "$tmp/cert.p12"
+[[ -s "$tmp/cert.p12" ]] || { echo "the narrowed export produced nothing" >&2; exit 1; }
 
 # --- store everything ------------------------------------------------------
 
