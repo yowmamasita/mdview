@@ -88,22 +88,28 @@ list_identities() {
     sed -n 's/^ *[0-9]*) \([0-9A-F][0-9A-F]*\) "\([^"]*\)".*/\1|\2/p'
 }
 
-before=$(list_identities | wc -l | tr -d ' ')
+# A keychain routinely lists one identity under several entries, so anything
+# counting rows counts the same certificate more than once. The hash is what
+# identifies it.
+count_identities() {
+  list_identities | cut -d'|' -f1 | sort -u | grep -c . || true
+}
 
-# A keychain can list the same identity more than once, and deleting an
-# already-deleted hash fails. Neither is a problem: what matters is the count
-# afterwards, which is checked below.
-list_identities | sort -u | while IFS='|' read -r hash name; do
+before=$(count_identities)
+
+# Deleting an already-deleted hash fails, which is fine — the count afterwards
+# is what decides.
+list_identities | sort -u -t'|' -k1,1 | while IFS='|' read -r hash name; do
   [[ "$name" == "$identity" ]] && continue
   if security delete-identity -Z "$hash" "$scratch" >/dev/null 2>&1; then
     echo "  dropped $name"
   fi
 done
 
-after=$(list_identities | wc -l | tr -d ' ')
+after=$(count_identities)
 if [[ "$after" != "1" ]]; then
-  echo "expected one identity to remain, found $after:" >&2
-  list_identities | cut -d'|' -f2 | sed 's/^/  /' >&2
+  echo "expected one certificate to remain, found $after:" >&2
+  list_identities | sort -u | sed 's/|/  /' | sed 's/^/  /' >&2
   exit 1
 fi
 echo "  kept 1 of $before"
