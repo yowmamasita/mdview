@@ -108,8 +108,11 @@ jobs:
       # one for CI — it is scoped, revocable, and unaffected by two-factor
       # prompts — but an Apple ID with an app-specific password is easier to
       # set up, so both are accepted.
+      # Notarisation requires a Developer ID signature; submitting an ad-hoc
+      # signed bundle is rejected. Requiring both means half-configured secrets
+      # fall back to an unsigned release rather than failing the run.
       - name: Notarize
-        if: env.APPLE_API_KEY != '' || env.APPLE_ID != ''
+        if: env.APPLE_SIGNING_IDENTITY != '' && (env.APPLE_API_KEY != '' || env.APPLE_ID != '')
         run: |
           ditto -c -k --keepParent target/mdview.app "$RUNNER_TEMP/notarize.zip"
 
