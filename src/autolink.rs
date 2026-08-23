@@ -24,7 +24,7 @@ pub struct Match {
 }
 
 /// Characters that may directly precede a `www.` autolink.
-const WWW_DELIMITERS: [u8; 4] = [b'*', b'_', b'~', b'('];
+const WWW_DELIMITERS: [u8; 4] = *b"*_~(";
 
 /// URL schemes recognised by the extended *url* autolink rule.
 const SAFE_SCHEMES: [&str; 3] = ["http://", "https://", "ftp://"];
