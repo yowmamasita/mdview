@@ -15,18 +15,18 @@ nothing else.
 
 ## Install
 
-macOS:
+macOS — download `mdview-macos-universal-app.tar.gz` from the
+[releases page](https://github.com/yowmamasita/mdview/releases), unpack it and
+drag `mdview.app` to Applications. It is signed and notarised, so it opens
+without a warning. Or, if you prefer one command:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/yowmamasita/mdview/main/scripts/install-macos.sh | sh
 ```
 
-Linux — download a tarball from the
-[releases page](https://github.com/yowmamasita/mdview/releases) and run the
-`install.sh` inside it. Windows — download the zip and run `mdview.exe`.
-
-Prebuilt binaries are signed ad-hoc rather than with a paid certificate; see
-[A note on signing](#a-note-on-signing).
+Linux — download a tarball and run the `install.sh` inside it. Windows —
+download the zip and run `mdview.exe`; see [A note on signing](#a-note-on-signing)
+for the SmartScreen warning.
 
 From source:
 
@@ -184,38 +184,44 @@ pointed at files that came from elsewhere.
 
 ## A note on signing
 
-Release binaries are ad-hoc signed. An Apple Developer ID certificate and an
-Authenticode certificate both cost money, so downloads carry the usual warnings:
-macOS refuses to open the application until the quarantine flag is cleared, and
-Windows SmartScreen reports an unrecognised publisher.
+**macOS releases are signed with a Developer ID certificate, notarised by Apple
+and stapled.** They open with no warning, and no `xattr` incantation, even when
+downloaded through a browser. The release workflow asserts as much before
+publishing:
 
-macOS attaches a quarantine flag to anything a browser downloads — through a
-tarball just as much as a zip — and an ad-hoc signed application cannot clear
-Gatekeeper while it carries that flag. `scripts/install-macos.sh` fetches the
-release with curl, which never sets the flag, so nothing needs suppressing. For
-a manual download:
-
-```sh
-xattr -dr com.apple.quarantine /Applications/mdview.app
+```
+target/mdview.app: accepted
+source=Notarized Developer ID
 ```
 
-The release workflow upgrades itself once the credentials exist — nothing in it
-needs changing:
+**Windows releases are not signed.** An Authenticode certificate costs money and
+there isn't one, so SmartScreen reports an unrecognised publisher — *More info*
+→ *Run anyway*.
+
+### Setting it up in a fork
+
+Signing is driven entirely by repository secrets; the workflow needs no changes.
 
 ```sh
 scripts/setup-signing.sh ~/Downloads/AuthKey_XXXXXXXX.p8 <key-id> <issuer-id>
 ```
 
-That exports the Developer ID certificate from your keychain and stores it, and
-the App Store Connect API key, as repository secrets. Tagged releases are then
-signed and notarised, and the warnings stop.
+That exports your Developer ID certificate and stores it, with an App Store
+Connect API key, as the six secrets the workflow looks for. Without them builds
+fall back to an ad-hoc signature rather than failing.
 
-The certificate has to be a **Developer ID Application** one. It is not the same
-as *Apple Development* (which signs builds for your own machines) or *Apple
-Distribution* (which signs App Store submissions) — neither of those can sign
-software distributed outside the App Store. Creating one costs nothing on an
-existing paid membership: Xcode → Settings → Accounts → your team → Manage
-Certificates → + → Developer ID Application.
+Two things are worth knowing before you run it:
+
+- The certificate must be a **Developer ID Application** one. *Apple Development*
+  signs builds for your own machines and *Apple Distribution* signs App Store
+  submissions; neither can sign software distributed outside the App Store.
+  Creating one costs nothing on an existing paid membership, but only through
+  Xcode or the web portal — the App Store Connect API refuses it with *"This
+  operation can only be performed by the Account Holder."*
+- `security export` cannot select a single identity; it takes every identity in
+  the keychain. The script therefore narrows the export down to the one
+  certificate that signs releases, so an App Store identity or a TLS client
+  certificate does not end up in a CI secret alongside it.
 
 Building from source sidesteps the question entirely.
 

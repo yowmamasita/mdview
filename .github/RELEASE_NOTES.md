@@ -25,24 +25,18 @@ sha256sum --check --ignore-missing SHA256SUMS
 
 ### macOS
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/yowmamasita/mdview/main/scripts/install-macos.sh | sh
-```
-
-This is the path of least resistance, and not only for convenience: macOS
-attaches a quarantine flag to anything a *browser* downloads, and an application
-signed ad-hoc rather than with a paid Developer ID cannot get past Gatekeeper
-once it carries that flag. A file fetched by curl is never quarantined, so the
-application simply opens. The script checks the published SHA-256 before
-installing.
-
-If you would rather download the tarball by hand, you have to clear the flag
-yourself:
+Signed with a Developer ID certificate, notarised by Apple and stapled, so it
+opens with no warning:
 
 ```sh
 tar -xzf mdview-macos-universal-app.tar.gz
 mv mdview.app /Applications/
-xattr -dr com.apple.quarantine /Applications/mdview.app
+```
+
+Or in one command, which also verifies the published SHA-256:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/yowmamasita/mdview/main/scripts/install-macos.sh | sh
 ```
 
 To make it your default Markdown viewer, right-click any `.md` file →
@@ -87,14 +81,14 @@ mdview-console.exe --print-html doc.md > doc.html
 
 ## A note on signing
 
-These binaries are **not** signed with an Apple Developer ID or an Authenticode
-certificate — both require a paid subscription. That is why macOS and Windows
-warn about them, and the warnings are the operating system doing its job: it has
-no way to confirm who produced the file.
+The macOS build is signed with a Developer ID certificate (team `7RX5G7H8DW`),
+notarised by Apple and stapled. Gatekeeper accepts it as
+`source=Notarized Developer ID`, browser download or not.
 
-The macOS installer above avoids the warning rather than suppressing it. It does
-not make the build any more trustworthy than the tarball; it just means macOS
-never marks it as having come from the web.
+The Windows builds are **not** signed — an Authenticode certificate costs money
+and there isn't one — so SmartScreen reports an unrecognised publisher. That
+warning is the operating system doing its job: it has no way to confirm who
+produced the file.
 
 If you would rather not take that on trust, building from source takes about a
 minute and produces exactly what is here:
