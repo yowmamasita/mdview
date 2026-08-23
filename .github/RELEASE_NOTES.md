@@ -25,8 +25,12 @@ sha256sum --check --ignore-missing SHA256SUMS
 
 ### macOS
 
-Signed with a Developer ID certificate, notarised by Apple and stapled, so it
-opens with no warning:
+```sh
+brew install --cask yowmamasita/tap/mdview
+```
+
+Or by hand. The build is signed with a Developer ID certificate, notarised by
+Apple and stapled, so it opens with no warning either way:
 
 ```sh
 tar -xzf mdview-macos-universal-app.tar.gz

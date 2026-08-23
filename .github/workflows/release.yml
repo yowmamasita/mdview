@@ -356,3 +356,17 @@ jobs:
             --title "mdview ${GITHUB_REF_NAME}" \
             --notes-file .github/RELEASE_NOTES.md \
             --verify-tag
+
+      # The tap is a separate repository, so this needs a token of its own.
+      # Without one the cask is updated by running scripts/update-tap.sh by
+      # hand. Never fatal: the release is already out by this point.
+      - name: Update the Homebrew cask
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        continue-on-error: true
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          scripts/update-tap.sh "${GITHUB_REF_NAME}"

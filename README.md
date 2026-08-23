@@ -15,7 +15,13 @@ nothing else.
 
 ## Install
 
-macOS — download `mdview-macos-universal-app.tar.gz` from the
+macOS, with Homebrew:
+
+```sh
+brew install --cask yowmamasita/tap/mdview
+```
+
+Or download `mdview-macos-universal-app.tar.gz` from the
 [releases page](https://github.com/yowmamasita/mdview/releases), unpack it and
 drag `mdview.app` to Applications. It is signed and notarised, so it opens
 without a warning. Or, if you prefer one command:
