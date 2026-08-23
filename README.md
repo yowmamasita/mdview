@@ -15,6 +15,13 @@ nothing else.
 
 ## Install
 
+Prebuilt binaries for macOS, Linux and Windows are on the
+[releases page](https://github.com/yowmamasita/mdview/releases). They are signed
+ad-hoc rather than with a paid certificate, so both macOS and Windows will warn
+about them — see [A note on signing](#a-note-on-signing).
+
+From source:
+
 ```sh
 cargo install --path .
 ```
@@ -160,6 +167,28 @@ served under a Content-Security-Policy with `default-src 'none'` and
 `connect-src 'none'`. A document cannot execute script, submit a form, be framed,
 or make a network request — belt and braces, because a viewer is routinely
 pointed at files that came from elsewhere.
+
+## A note on signing
+
+Release binaries are ad-hoc signed. An Apple Developer ID certificate and an
+Authenticode certificate both cost money, so downloads carry the usual warnings:
+macOS refuses to open the application until the quarantine flag is cleared, and
+Windows SmartScreen reports an unrecognised publisher.
+
+On macOS:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/mdview.app
+```
+
+The release workflow does upgrade itself automatically when the certificates
+exist. Set `APPLE_CERTIFICATE_P12`, `APPLE_CERTIFICATE_PASSWORD` and
+`APPLE_SIGNING_IDENTITY` as repository secrets and builds are signed with a
+Developer ID; add `APPLE_ID`, `APPLE_TEAM_ID` and `APPLE_APP_PASSWORD` and they
+are notarised and stapled too, at which point the warnings stop. Nothing needs
+to change in the workflow.
+
+Building from source sidesteps the question entirely.
 
 ## Conformance
 

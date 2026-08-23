@@ -3,30 +3,43 @@
 #
 #   scripts/install-linux.sh
 #
+# Works both from a source checkout, where it builds first, and from an
+# unpacked release tarball, where the binary is already sitting next to it.
 # Everything goes under ~/.local, so no root is needed. `xdg-mime` is what
 # actually sets the association; the desktop entry is what makes mdview appear
 # in a file manager's "Open With" list at all.
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+here="$(cd "$(dirname "$0")" && pwd)"
 
 BIN_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
 DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}"
 APPS_DIR="$DATA_DIR/applications"
 ICON_DIR="$DATA_DIR/icons/hicolor/512x512/apps"
 
-echo "==> building"
-cargo build --release
+# Release tarball layout, or source checkout.
+if [[ -x "$here/mdview" ]]; then
+  binary="$here/mdview"
+  desktop="$here/mdview.desktop"
+  icon="$here/mdview.png"
+else
+  cd "$here/.."
+  echo "==> building"
+  cargo build --release
+  binary="$PWD/target/release/mdview"
+  desktop="$PWD/packaging/linux/mdview.desktop"
+  icon="$PWD/packaging/macos/icon-1024.png"
+fi
 
 echo "==> installing binary to $BIN_DIR"
 mkdir -p "$BIN_DIR"
-install -m 755 target/release/mdview "$BIN_DIR/mdview"
+install -m 755 "$binary" "$BIN_DIR/mdview"
 
 echo "==> installing desktop entry and icon"
 mkdir -p "$APPS_DIR" "$ICON_DIR"
-install -m 644 packaging/linux/mdview.desktop "$APPS_DIR/mdview.desktop"
-install -m 644 packaging/macos/icon-1024.png "$ICON_DIR/mdview.png"
+install -m 644 "$desktop" "$APPS_DIR/mdview.desktop"
+install -m 644 "$icon" "$ICON_DIR/mdview.png"
 
 if command -v update-desktop-database >/dev/null; then
   update-desktop-database "$APPS_DIR"

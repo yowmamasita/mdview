@@ -1,0 +1,259 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  # Lets the whole matrix be exercised before a tag exists. Artifacts are
+  # uploaded to the run; nothing is published.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ---------------------------------------------------------------- macOS
+  #
+  # Both architectures are built on the arm64 runner and joined with `lipo`, so
+  # there is one download that runs everywhere rather than two the user has to
+  # choose between.
+  macos:
+    name: macOS (universal)
+    runs-on: macos-14
+    env:
+      APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build both architectures
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+
+      - name: Join into a universal binary
+        run: |
+          mkdir -p target/release
+          lipo -create -output target/release/mdview \
+            target/aarch64-apple-darwin/release/mdview \
+            target/x86_64-apple-darwin/release/mdview
+          lipo -info target/release/mdview
+
+      # Present only if the repository has an Apple Developer certificate
+      # configured. Without it the bundle is ad-hoc signed, which still runs but
+      # is not notarised — see README, "A note on signing".
+      - name: Import Developer ID certificate
+        if: env.APPLE_CERTIFICATE_P12 != ''
+        run: |
+          keychain=$RUNNER_TEMP/build.keychain
+          password=$(uuidgen)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$password" "$keychain" >/dev/null
+          security list-keychain -d user -s "$keychain" login.keychain
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      - name: Build the app bundle
+        run: |
+          # --no-build keeps the universal binary assembled above; a rebuild
+          # would replace it with an arm64-only one.
+          MDVIEW_SIGN_IDENTITY="${APPLE_SIGNING_IDENTITY:--}" \
+            scripts/bundle-macos.sh --no-build
+
+      - name: Notarize
+        if: env.APPLE_ID != ''
+        run: |
+          ditto -c -k --keepParent target/mdview.app "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --wait
+          xcrun stapler staple target/mdview.app
+
+      # A tarball, not a zip: Archive Utility copies the quarantine flag onto
+      # everything it extracts from a zip, while `tar` does not. For an
+      # unnotarised build that is the difference between the application opening
+      # and Gatekeeper refusing it outright.
+      - name: Package
+        run: |
+          mkdir -p dist
+          # The application, with the bundle at the root so it can be dragged
+          # straight into /Applications.
+          rm -rf stage && mkdir -p stage
+          cp -R target/mdview.app stage/
+          cp README.md LICENSE stage/
+          tar -C stage -czf dist/mdview-macos-universal-app.tar.gz .
+          # The command line binary, in a directory of its own.
+          rm -rf stage && mkdir -p stage/mdview-macos-universal
+          cp target/release/mdview README.md LICENSE stage/mdview-macos-universal/
+          tar -C stage -czf dist/mdview-macos-universal.tar.gz mdview-macos-universal
+
+      - name: Smoke test
+        run: |
+          ./target/release/mdview --version
+          ./target/release/mdview --print-html README.md > /dev/null
+          codesign --verify --strict --verbose=2 target/mdview.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: dist/*
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------- Linux
+  #
+  # Built on the oldest runner image that still carries webkit2gtk-4.1, since
+  # the glibc it links against sets the floor for which distributions can run
+  # the result.
+  linux:
+    name: Linux (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libdbus-1-dev pkg-config
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        run: |
+          name=mdview-linux-${{ matrix.arch }}
+          mkdir -p dist "stage/$name"
+          cp target/${{ matrix.target }}/release/mdview "stage/$name/"
+          cp packaging/linux/mdview.desktop "stage/$name/"
+          cp packaging/macos/icon-1024.png "stage/$name/mdview.png"
+          cp scripts/install-linux.sh "stage/$name/install.sh"
+          cp README.md LICENSE "stage/$name/"
+          chmod +x "stage/$name/install.sh" "stage/$name/mdview"
+          tar -C stage -czf "dist/$name.tar.gz" "$name"
+
+      - name: Smoke test
+        run: |
+          ./target/${{ matrix.target }}/release/mdview --version
+          ./target/${{ matrix.target }}/release/mdview --print-html README.md > /dev/null
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+  # -------------------------------------------------------------- Windows
+  windows:
+    name: Windows (${{ matrix.arch }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            target: x86_64-pc-windows-msvc
+          - arch: aarch64
+            target: aarch64-pc-windows-msvc
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $name = "mdview-windows-${{ matrix.arch }}"
+          New-Item -ItemType Directory -Force -Path dist, "stage/$name" | Out-Null
+          Copy-Item target/${{ matrix.target }}/release/mdview.exe "stage/$name/"
+          Copy-Item README.md, LICENSE "stage/$name/"
+          Compress-Archive -Path "stage/$name" -DestinationPath "dist/$name.zip"
+
+      # An arm64 binary cannot run on the x64 runner that produced it.
+      - name: Smoke test
+        if: matrix.arch == 'x86_64'
+        shell: pwsh
+        run: |
+          ./target/${{ matrix.target }}/release/mdview.exe --version
+          ./target/${{ matrix.target }}/release/mdview.exe --print-html README.md > $null
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+  # -------------------------------------------------------------- publish
+  release:
+    name: Publish
+    needs: [macos, linux, windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect and checksum
+        run: |
+          mkdir -p dist
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} dist/ \;
+          cd dist
+          sha256sum * > SHA256SUMS
+          ls -lh
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --title "mdview ${GITHUB_REF_NAME}" \
+            --notes-file .github/RELEASE_NOTES.md \
+            --verify-tag

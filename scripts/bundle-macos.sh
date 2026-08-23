@@ -4,6 +4,7 @@
 #
 #   scripts/bundle-macos.sh              build into target/
 #   scripts/bundle-macos.sh --install    also install and make it the default
+#   scripts/bundle-macos.sh --no-build   bundle target/release/mdview as it is
 #
 # Finder only offers applications, not bare executables, in "Open With"; and it
 # passes a double-clicked file as an Apple Event rather than an argument, which
@@ -22,11 +23,25 @@ INSTALL_DIR="/Applications"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 
 install=false
-[[ "${1:-}" == "--install" ]] && install=true
+build=true
+for arg in "$@"; do
+  case "$arg" in
+    --install) install=true ;;
+    # Release builds join two architectures into one binary before getting
+    # here; rebuilding would replace it with a single-architecture one.
+    --no-build) build=false ;;
+    *) echo "unknown option: $arg" >&2; exit 2 ;;
+  esac
+done
 
 version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)
-echo "==> building mdview $version"
-cargo build --release
+if $build; then
+  echo "==> building mdview $version"
+  cargo build --release
+elif [[ ! -x "$BUILD_DIR/release/$APP_NAME" ]]; then
+  echo "no binary at $BUILD_DIR/release/$APP_NAME; drop --no-build" >&2
+  exit 1
+fi
 
 echo "==> assembling $APP"
 rm -rf "$APP"
@@ -49,10 +64,22 @@ done
 iconutil --convert icns "$iconset" --output "$APP/Contents/Resources/$APP_NAME.icns"
 rm -rf "$iconset"
 
-# An unsigned bundle is quarantined on first launch; an ad-hoc signature is
-# enough for a locally built application and keeps Gatekeeper quiet.
-echo "==> signing (ad-hoc)"
-codesign --force --sign - "$APP"
+# arm64 macOS refuses to run a binary with no signature at all, so this always
+# happens. `MDVIEW_SIGN_IDENTITY` upgrades it from an ad-hoc signature to a real
+# Developer ID one, which is what release builds use when a certificate is
+# available. Ad-hoc is fine for a locally built application; it is only
+# downloads that Gatekeeper treats differently.
+identity="${MDVIEW_SIGN_IDENTITY:--}"
+if [[ "$identity" == "-" ]]; then
+  echo "==> signing (ad-hoc)"
+  codesign --force --sign - "$APP"
+else
+  echo "==> signing as $identity"
+  codesign --force --options runtime --timestamp \
+    --sign "$identity" "$APP/Contents/MacOS/$APP_NAME"
+  codesign --force --options runtime --timestamp --sign "$identity" "$APP"
+fi
+codesign --verify --strict "$APP"
 
 echo "built $APP"
 
