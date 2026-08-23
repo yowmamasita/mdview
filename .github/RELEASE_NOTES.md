@@ -75,6 +75,16 @@ with Windows 11 and current Windows 10.
 To make it the default: right-click a `.md` file → *Open with* → *Choose another
 app* → browse to `mdview.exe` → *Always use this app*.
 
+The zip contains two executables. `mdview.exe` is the viewer, built without a
+console so opening a document raises no black window behind it. Neither `cmd`
+nor PowerShell waits for a program built that way, which makes redirecting its
+output unreliable, so `mdview-console.exe` is the same program with a console
+attached — use it in scripts:
+
+```
+mdview-console.exe --print-html doc.md > doc.html
+```
+
 ## A note on signing
 
 These binaries are **not** signed with an Apple Developer ID or an Authenticode

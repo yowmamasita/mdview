@@ -19,12 +19,22 @@ path = "src/lib.rs"
 name = "mdview"
 path = "src/main.rs"
 
+# Windows only. `mdview.exe` is a GUI-subsystem binary so Explorer launches do
+# not raise a console; shells consequently do not wait for it, which breaks
+# redirection. This twin is the same program with a console subsystem.
+[[bin]]
+name = "mdview-console"
+path = "src/bin/mdview-console.rs"
+required-features = ["windows-console"]
+
 [features]
 default = ["gui", "mermaid"]
 # Native window + system webview. Disable for a headless build (`--print-html` only).
 gui = ["dep:wry", "dep:tao", "dep:muda", "dep:rfd", "dep:notify", "dep:open", "dep:url"]
 # Embed the Mermaid runtime so diagrams render with no network access.
 mermaid = []
+# Build the console-subsystem twin. Only meaningful on Windows.
+windows-console = []
 
 [dependencies]
 pulldown-cmark = { version = "0.13.4", default-features = false, features = ["html", "simd"] }

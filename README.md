@@ -119,6 +119,12 @@ needed.
 Right-click a `.md` file → *Open with* → *Choose another app* → browse to
 `mdview.exe` → check *Always use this app*.
 
+Release zips carry two executables. `mdview.exe` has no console, so opening a
+document from Explorer raises no window behind the viewer; the price is that
+shells do not wait for it and redirecting its output is unreliable.
+`mdview-console.exe` is the same program with a console, for scripts. Building
+it from source needs `--features windows-console`.
+
 ### Keys
 
 | Key | Action |

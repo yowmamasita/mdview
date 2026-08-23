@@ -9,9 +9,11 @@
 //! * [`document`] wraps a fragment in the standalone page the webview loads.
 //! * [`assets`] holds the vendored stylesheet, viewer script and Mermaid runtime.
 //! * [`protocol`] maps webview requests onto the filesystem.
+//! * [`cli`] is the command line, shared by both Windows executables.
 
 pub mod assets;
 pub mod autolink;
+pub mod cli;
 pub mod document;
 pub mod markdown;
 pub mod protocol;

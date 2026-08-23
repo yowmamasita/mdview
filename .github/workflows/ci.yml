@@ -45,7 +45,7 @@ jobs:
         run: cargo clippy --all-targets --all-features
 
       - name: Build
-        run: cargo build --release
+        run: cargo build --release --features windows-console
 
       # The window itself needs a display; everything else runs headless.
       - name: Test
@@ -63,31 +63,33 @@ jobs:
           plutil -lint target/mdview.app/Contents/Info.plist
           test -f target/mdview.app/Contents/Resources/mdview.icns
 
-      # A console-subsystem binary would give every Explorer launch — including
-      # a double-clicked .md file — a stray console window behind the viewer.
-      - name: Assert the GUI subsystem
+      # `mdview.exe` must be GUI (2) so an Explorer launch raises no console;
+      # `mdview-console.exe` must be console (3) so a shell waits for it and
+      # redirection works. Getting either wrong is invisible until a user hits
+      # it, so both are checked here.
+      - name: Assert the subsystems
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $exe = "target/release/mdview.exe"
-          $bytes = [IO.File]::ReadAllBytes($exe)
-          $pe = [BitConverter]::ToInt32($bytes, 0x3C)
-          $subsystem = [BitConverter]::ToUInt16($bytes, $pe + 0x5C)
-          # 2 = IMAGE_SUBSYSTEM_WINDOWS_GUI, 3 = ..._WINDOWS_CUI
-          if ($subsystem -ne 2) {
-            throw "expected the GUI subsystem (2), got $subsystem"
+          function Get-Subsystem($path) {
+            $bytes = [IO.File]::ReadAllBytes($path)
+            $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+            [BitConverter]::ToUInt16($bytes, $pe + 0x5C)
           }
-          "subsystem $subsystem (GUI)"
+          $dir = "target/release"
+          $gui = Get-Subsystem "$dir/mdview.exe"
+          $con = Get-Subsystem "$dir/mdview-console.exe"
+          if ($gui -ne 2) { throw "mdview.exe: expected GUI (2), got $gui" }
+          if ($con -ne 3) { throw "mdview-console.exe: expected console (3), got $con" }
+          "mdview.exe GUI, mdview-console.exe console"
 
-      # Redirection is the case that actually broke: `AttachConsole` replaces
-      # the standard handles, so a naive attach discards the pipe or file the
-      # shell handed down. Both shells are checked because they redirect
-      # differently.
+      # Redirection through the console binary, in both shells, since they
+      # redirect differently. This is what a script would do.
       - name: Smoke test redirection
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $exe = "target/release/mdview.exe"
+          $exe = "target/release/mdview-console.exe"
           & $exe --print-html README.md > pwsh.html
           if ((Get-Item pwsh.html).Length -lt 1000) { throw "pwsh redirect produced nothing" }
           cmd /c "$exe --version > cmd.txt"
