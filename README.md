@@ -19,7 +19,13 @@ nothing else.
 cargo install --path .
 ```
 
-Or build a release binary:
+That puts `mdview` in `~/.cargo/bin`, so you can open a file from anywhere:
+
+```sh
+mdview README.md
+```
+
+Or build a release binary without installing it:
 
 ```sh
 cargo build --release   # target/release/mdview
@@ -89,8 +95,9 @@ graph LR
 ````
 
 The runtime is compiled into the binary, so diagrams render with no network
-access. It is also most of the binary: 5.3 MB with it, 1.9 MB without.
-`cargo build --release --no-default-features --features gui` leaves it out.
+access. It is also most of the binary — 5.9 MB with it against 2.4 MB without,
+stripped, on arm64 macOS. `cargo build --release --no-default-features --features gui`
+leaves it out.
 
 ## How it works
 
