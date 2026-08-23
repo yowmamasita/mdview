@@ -61,11 +61,24 @@ impl Counter {
         false
     }
 
-    /// Give the watcher a chance to fire, then report whether it stayed quiet.
-    fn stayed_quiet_at(&self, expected: usize) -> bool {
+    /// Give the watcher a chance to fire, then report whether the count is
+    /// still what it was.
+    fn stayed_quiet_since(&self, baseline: usize) -> bool {
         std::thread::sleep(Duration::from_millis(600));
-        self.get() == expected
+        self.get() == baseline
     }
+}
+
+/// Let a freshly registered watch settle, and return the resulting count.
+///
+/// macOS delivers FSEvents from a shared kernel queue, and a stream opened
+/// "from now" can still replay an event that was already in flight — such as
+/// the write that created the fixture a moment earlier. Waiting past that and
+/// taking the count as a baseline keeps the tests about what they mean to
+/// test: that a *subsequent* edit does or does not reach the watcher.
+fn settle(counter: &Counter) -> usize {
+    std::thread::sleep(Duration::from_millis(400));
+    counter.get()
 }
 
 fn watcher_with_counter() -> (FileWatcher, Counter) {
@@ -84,9 +97,10 @@ fn an_edit_fires_a_change() {
     let path = scratch.write("doc.md", "# One\n");
     let (mut watcher, counter) = watcher_with_counter();
     watcher.watch(Some(&path)).expect("watch");
+    let baseline = settle(&counter);
 
     fs::write(&path, "# Two\n").expect("edit");
-    assert!(counter.wait_for(1), "no change reported");
+    assert!(counter.wait_for(baseline + 1), "no change reported");
 }
 
 #[test]
@@ -97,12 +111,16 @@ fn an_atomic_replacement_fires_a_change() {
     let path = scratch.write("doc.md", "# One\n");
     let (mut watcher, counter) = watcher_with_counter();
     watcher.watch(Some(&path)).expect("watch");
+    let baseline = settle(&counter);
 
     let temp = scratch.0.join("doc.md.tmp");
     fs::write(&temp, "# Two\n").expect("write temp");
     fs::rename(&temp, &path).expect("rename over");
 
-    assert!(counter.wait_for(1), "no change reported after rename");
+    assert!(
+        counter.wait_for(baseline + 1),
+        "no change reported after rename"
+    );
 }
 
 #[test]
@@ -111,15 +129,16 @@ fn a_burst_of_writes_is_coalesced() {
     let path = scratch.write("doc.md", "# One\n");
     let (mut watcher, counter) = watcher_with_counter();
     watcher.watch(Some(&path)).expect("watch");
+    let baseline = settle(&counter);
 
     for i in 0..10 {
         fs::write(&path, format!("# {i}\n")).expect("edit");
         std::thread::sleep(Duration::from_millis(5));
     }
 
-    assert!(counter.wait_for(1), "no change reported");
+    assert!(counter.wait_for(baseline + 1), "no change reported");
     std::thread::sleep(Duration::from_millis(400));
-    let fired = counter.get();
+    let fired = counter.get() - baseline;
     assert!(fired <= 3, "10 rapid writes produced {fired} reloads");
 }
 
@@ -130,8 +149,13 @@ fn edits_to_a_sibling_file_are_ignored() {
     let (mut watcher, counter) = watcher_with_counter();
     watcher.watch(Some(&path)).expect("watch");
 
+    let baseline = settle(&counter);
+
     scratch.write("other.md", "# Other\n");
-    assert!(counter.stayed_quiet_at(0), "a sibling edit fired a reload");
+    assert!(
+        counter.stayed_quiet_since(baseline),
+        "a sibling edit fired a reload"
+    );
 }
 
 #[test]
@@ -143,12 +167,19 @@ fn switching_documents_stops_watching_the_old_one() {
 
     watcher.watch(Some(&first)).expect("watch first");
     watcher.watch(Some(&second)).expect("watch second");
+    let baseline = settle(&counter);
 
     fs::write(&first, "# Changed\n").expect("edit first");
-    assert!(counter.stayed_quiet_at(0), "the old document still fires");
+    assert!(
+        counter.stayed_quiet_since(baseline),
+        "the old document still fires"
+    );
 
     fs::write(&second, "# Changed\n").expect("edit second");
-    assert!(counter.wait_for(1), "the new document does not fire");
+    assert!(
+        counter.wait_for(baseline + 1),
+        "the new document does not fire"
+    );
 }
 
 #[test]
@@ -159,9 +190,13 @@ fn watching_nothing_is_allowed() {
 
     watcher.watch(Some(&path)).expect("watch");
     watcher.watch(None).expect("unwatch");
+    let baseline = settle(&counter);
 
     fs::write(&path, "# Two\n").expect("edit");
-    assert!(counter.stayed_quiet_at(0), "unwatched file still fires");
+    assert!(
+        counter.stayed_quiet_since(baseline),
+        "unwatched file still fires"
+    );
 }
 
 #[test]
@@ -172,11 +207,13 @@ fn watching_the_same_file_twice_is_harmless() {
 
     watcher.watch(Some(&path)).expect("first");
     watcher.watch(Some(&path)).expect("second");
+    let baseline = settle(&counter);
 
     fs::write(&path, "# Two\n").expect("edit");
-    assert!(counter.wait_for(1), "no change reported");
+    assert!(counter.wait_for(baseline + 1), "no change reported");
     std::thread::sleep(Duration::from_millis(400));
-    assert!(counter.get() <= 2, "registered twice: {}", counter.get());
+    let fired = counter.get() - baseline;
+    assert!(fired <= 2, "registered twice: {fired} reloads for one edit");
 }
 
 #[test]
@@ -192,7 +229,8 @@ fn deleting_the_document_fires_a_change() {
     let path = scratch.write("doc.md", "# One\n");
     let (mut watcher, counter) = watcher_with_counter();
     watcher.watch(Some(&path)).expect("watch");
+    let baseline = settle(&counter);
 
     fs::remove_file(&path).expect("delete");
-    assert!(counter.wait_for(1), "deletion was not reported");
+    assert!(counter.wait_for(baseline + 1), "deletion was not reported");
 }
