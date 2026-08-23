@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use muda::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu, accelerator::Accelerator};
 use tao::dpi::LogicalSize;
-use tao::event::{Event, StartCause, WindowEvent};
+use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 use tao::window::WindowBuilder;
 use wry::http::{Request, Response, header};
@@ -156,7 +156,6 @@ pub fn run(options: Options) -> Result<(), Box<dyn Error>> {
         *control_flow = ControlFlow::Wait;
 
         match event {
-            Event::NewEvents(StartCause::Init) => {}
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
