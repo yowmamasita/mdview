@@ -243,7 +243,9 @@ jobs:
           $exe = "target/${{ matrix.target }}/release/mdview-console.exe"
           & $exe --print-html README.md > pwsh.html
           if ((Get-Item pwsh.html).Length -lt 1000) { throw "pwsh redirect produced nothing" }
-          cmd /c "$exe --version > cmd.txt"
+          # cmd needs a native path with backslashes, and quoting around it.
+          $native = (Resolve-Path $exe).Path
+          cmd /c "`"$native`" --version > cmd.txt"
           if ((Get-Item cmd.txt).Length -lt 5) { throw "cmd redirect produced nothing" }
           "pwsh $((Get-Item pwsh.html).Length) bytes, cmd $((Get-Item cmd.txt).Length) bytes"
 
