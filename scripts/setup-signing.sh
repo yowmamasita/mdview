@@ -68,11 +68,11 @@ chmod 700 "$tmp"
 # same value is stored alongside it so the workflow can open it.
 p12_password=$(uuidgen)
 
-# `security export` has no way to select one identity — it takes everything in
-# the keychain, which here would also mean the Apple Development and Apple
-# Distribution certificates. Those have no business in a CI secret, so the
-# export is reloaded into a scratch keychain and pared back to the one identity
-# that signs releases.
+# `security export` has no way to select one identity — it takes every identity
+# in the keychain. On a real machine that means App Store signing certificates,
+# TLS client certificates, whatever an MDM enrolled: none of which belong in a
+# CI secret. So the export is reloaded into a scratch keychain and pared back to
+# the single identity that signs releases.
 echo "==> exporting from your keychain (it will ask for permission)"
 security export -t identities -f pkcs12 -P "$p12_password" -o "$tmp/all.p12"
 [[ -s "$tmp/all.p12" ]] || { echo "the export produced nothing" >&2; exit 1; }
@@ -82,24 +82,35 @@ security create-keychain -p "$p12_password" "$scratch"
 security unlock-keychain -p "$p12_password" "$scratch"
 security import "$tmp/all.p12" -k "$scratch" -P "$p12_password" -A >/dev/null
 
-before=$(security find-identity "$scratch" 2>/dev/null | grep -c '^ *[0-9]*)' || true)
-security find-identity "$scratch" 2>/dev/null |
-  sed -n 's/^ *[0-9]*) \([0-9A-F][0-9A-F]*\) "\([^"]*\)".*/\1|\2/p' |
-  while IFS='|' read -r hash name; do
-    [[ "$name" == "$identity" ]] && continue
-    security delete-identity -Z "$hash" "$scratch" >/dev/null 2>&1 &&
-      echo "  dropped $name"
-  done
+# `hash|name` for each identity in the scratch keychain.
+list_identities() {
+  security find-identity "$scratch" 2>/dev/null |
+    sed -n 's/^ *[0-9]*) \([0-9A-F][0-9A-F]*\) "\([^"]*\)".*/\1|\2/p'
+}
 
-after=$(security find-identity "$scratch" 2>/dev/null | grep -c '^ *[0-9]*)' || true)
+before=$(list_identities | wc -l | tr -d ' ')
+
+# A keychain can list the same identity more than once, and deleting an
+# already-deleted hash fails. Neither is a problem: what matters is the count
+# afterwards, which is checked below.
+list_identities | sort -u | while IFS='|' read -r hash name; do
+  [[ "$name" == "$identity" ]] && continue
+  if security delete-identity -Z "$hash" "$scratch" >/dev/null 2>&1; then
+    echo "  dropped $name"
+  fi
+done
+
+after=$(list_identities | wc -l | tr -d ' ')
 if [[ "$after" != "1" ]]; then
-  echo "expected one identity to remain, found $after" >&2
+  echo "expected one identity to remain, found $after:" >&2
+  list_identities | cut -d'|' -f2 | sed 's/^/  /' >&2
   exit 1
 fi
 echo "  kept 1 of $before"
 
 security export -k "$scratch" -t identities -f pkcs12 -P "$p12_password" -o "$tmp/cert.p12"
 [[ -s "$tmp/cert.p12" ]] || { echo "the narrowed export produced nothing" >&2; exit 1; }
+echo "  $(wc -c < "$tmp/all.p12" | tr -d ' ') bytes exported, $(wc -c < "$tmp/cert.p12" | tr -d ' ') stored"
 
 # --- store everything ------------------------------------------------------
 

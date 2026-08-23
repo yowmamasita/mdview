@@ -97,6 +97,19 @@ jobs:
           security list-keychain -d user -s "$keychain" login.keychain
           rm -f "$RUNNER_TEMP/cert.p12"
 
+      # A .p12 carries the leaf certificate and its key, not the intermediate
+      # that links it to Apple's root. Runner images normally have it, but
+      # signing fails outright when they do not, so it is installed explicitly.
+      - name: Install Apple's Developer ID intermediate
+        if: env.APPLE_CERTIFICATE_P12 != ''
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/DeveloperIDG2CA.cer" \
+            https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          sudo security add-certificates -k /Library/Keychains/System.keychain \
+            "$RUNNER_TEMP/DeveloperIDG2CA.cer" || \
+            security add-certificates -k "$RUNNER_TEMP/build.keychain" \
+              "$RUNNER_TEMP/DeveloperIDG2CA.cer"
+
       - name: Build the app bundle
         run: |
           # --no-build keeps the universal binary assembled above; a rebuild
