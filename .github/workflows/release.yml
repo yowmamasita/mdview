@@ -14,6 +14,28 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # A tag that disagrees with Cargo.toml ships binaries whose `--version`
+  # contradicts the release they came from. Cheap to check, easy to forget.
+  version:
+    name: Check the version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag must match Cargo.toml
+        run: |
+          crate=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)
+          echo "Cargo.toml: $crate"
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            echo "not a tag build; nothing to compare"
+            exit 0
+          fi
+          tag="${GITHUB_REF_NAME#v}"
+          echo "tag:        $tag"
+          if [ "$crate" != "$tag" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match Cargo.toml version $crate"
+            exit 1
+          fi
+
   # ---------------------------------------------------------------- macOS
   #
   # Both architectures are built on the arm64 runner and joined with `lipo`, so
@@ -21,6 +43,7 @@ jobs:
   # choose between.
   macos:
     name: macOS (universal)
+    needs: version
     runs-on: macos-14
     env:
       APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
@@ -127,6 +150,7 @@ jobs:
   # the result.
   linux:
     name: Linux (${{ matrix.arch }})
+    needs: version
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -183,6 +207,7 @@ jobs:
   # -------------------------------------------------------------- Windows
   windows:
     name: Windows (${{ matrix.arch }})
+    needs: version
     runs-on: windows-latest
     strategy:
       fail-fast: false
