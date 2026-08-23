@@ -1,5 +1,11 @@
 //! `mdview` — a lightweight Markdown viewer.
 
+// Without this, Windows gives every launch a console window — including the one
+// Explorer starts when a `.md` file is double-clicked, which would sit behind
+// the viewer for as long as it runs. `attach_parent_console` below hands the
+// command line modes their output back.
+#![cfg_attr(windows, windows_subsystem = "windows")]
+
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -44,7 +50,33 @@ KEYS:
     Ctrl/Cmd+/-/0 zoom               g / G       top / bottom
 ";
 
+/// Reattach to the console that launched us, if there was one.
+///
+/// A `windows` subsystem binary starts with no standard handles, so `--help`,
+/// `--version` and `--print-html` would write into nothing when run from a
+/// terminal. Attaching to the parent's console restores them. Launched from
+/// Explorer there is no parent console, the call fails, and nothing is shown —
+/// which is the point.
+#[cfg(windows)]
+fn attach_parent_console() {
+    /// `ATTACH_PARENT_PROCESS`
+    const PARENT: u32 = u32::MAX;
+
+    // Provided by kernel32, which the MSVC target links by default.
+    unsafe extern "system" {
+        fn AttachConsole(process_id: u32) -> i32;
+    }
+
+    unsafe { AttachConsole(PARENT) };
+}
+
+/// Nothing to do anywhere else.
+#[cfg(not(windows))]
+fn attach_parent_console() {}
+
 fn main() -> ExitCode {
+    attach_parent_console();
+
     match parse_args() {
         Ok(None) => ExitCode::SUCCESS,
         Ok(Some(args)) => match dispatch(args) {

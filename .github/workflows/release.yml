@@ -214,13 +214,31 @@ jobs:
           Copy-Item README.md, LICENSE "stage/$name/"
           Compress-Archive -Path "stage/$name" -DestinationPath "dist/$name.zip"
 
+      # A console-subsystem binary would give every Explorer launch — including
+      # a double-clicked .md file — a stray console window behind the viewer.
+      - name: Assert the GUI subsystem
+        shell: pwsh
+        run: |
+          $exe = "target/${{ matrix.target }}/release/mdview.exe"
+          $bytes = [IO.File]::ReadAllBytes($exe)
+          $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+          $subsystem = [BitConverter]::ToUInt16($bytes, $pe + 0x5C)
+          # 2 = IMAGE_SUBSYSTEM_WINDOWS_GUI, 3 = ..._WINDOWS_CUI
+          if ($subsystem -ne 2) {
+            throw "expected the GUI subsystem (2), got $subsystem"
+          }
+          "subsystem $subsystem (GUI)"
+
       # An arm64 binary cannot run on the x64 runner that produced it.
       - name: Smoke test
         if: matrix.arch == 'x86_64'
         shell: pwsh
         run: |
-          ./target/${{ matrix.target }}/release/mdview.exe --version
-          ./target/${{ matrix.target }}/release/mdview.exe --print-html README.md > $null
+          # Redirected to a file rather than checked on the console: a GUI
+          # subsystem process only has standard handles when it is given them.
+          ./target/${{ matrix.target }}/release/mdview.exe --print-html README.md > out.html
+          if ((Get-Item out.html).Length -lt 1000) { throw "no output" }
+          "rendered $((Get-Item out.html).Length) bytes"
 
       - uses: actions/upload-artifact@v4
         with:
