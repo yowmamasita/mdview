@@ -15,10 +15,18 @@ nothing else.
 
 ## Install
 
-Prebuilt binaries for macOS, Linux and Windows are on the
-[releases page](https://github.com/yowmamasita/mdview/releases). They are signed
-ad-hoc rather than with a paid certificate, so both macOS and Windows will warn
-about them — see [A note on signing](#a-note-on-signing).
+macOS:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/yowmamasita/mdview/main/scripts/install-macos.sh | sh
+```
+
+Linux — download a tarball from the
+[releases page](https://github.com/yowmamasita/mdview/releases) and run the
+`install.sh` inside it. Windows — download the zip and run `mdview.exe`.
+
+Prebuilt binaries are signed ad-hoc rather than with a paid certificate; see
+[A note on signing](#a-note-on-signing).
 
 From source:
 
@@ -175,7 +183,11 @@ Authenticode certificate both cost money, so downloads carry the usual warnings:
 macOS refuses to open the application until the quarantine flag is cleared, and
 Windows SmartScreen reports an unrecognised publisher.
 
-On macOS:
+macOS attaches a quarantine flag to anything a browser downloads — through a
+tarball just as much as a zip — and an ad-hoc signed application cannot clear
+Gatekeeper while it carries that flag. `scripts/install-macos.sh` fetches the
+release with curl, which never sets the flag, so nothing needs suppressing. For
+a manual download:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/mdview.app

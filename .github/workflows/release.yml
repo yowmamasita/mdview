@@ -89,10 +89,11 @@ jobs:
             --wait
           xcrun stapler staple target/mdview.app
 
-      # A tarball, not a zip: Archive Utility copies the quarantine flag onto
-      # everything it extracts from a zip, while `tar` does not. For an
-      # unnotarised build that is the difference between the application opening
-      # and Gatekeeper refusing it outright.
+      # A tarball rather than a zip because it preserves the bundle's symlinks
+      # and permission bits. It does not dodge Gatekeeper: current macOS
+      # propagates the quarantine flag through `tar` just as it does through
+      # Archive Utility, which is why scripts/install-macos.sh exists — a file
+      # fetched by curl is never quarantined in the first place.
       - name: Package
         run: |
           mkdir -p dist
