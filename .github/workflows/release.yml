@@ -52,6 +52,9 @@ jobs:
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
 
     steps:
       - uses: actions/checkout@v4
@@ -101,16 +104,34 @@ jobs:
           MDVIEW_SIGN_IDENTITY="${APPLE_SIGNING_IDENTITY:--}" \
             scripts/bundle-macos.sh --no-build
 
+      # Either credential works. An App Store Connect API key is the better
+      # one for CI — it is scoped, revocable, and unaffected by two-factor
+      # prompts — but an Apple ID with an app-specific password is easier to
+      # set up, so both are accepted.
       - name: Notarize
-        if: env.APPLE_ID != ''
+        if: env.APPLE_API_KEY != '' || env.APPLE_ID != ''
         run: |
           ditto -c -k --keepParent target/mdview.app "$RUNNER_TEMP/notarize.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
-            --apple-id "$APPLE_ID" \
-            --team-id "$APPLE_TEAM_ID" \
-            --password "$APPLE_APP_PASSWORD" \
-            --wait
+
+          if [ -n "$APPLE_API_KEY" ]; then
+            echo "$APPLE_API_KEY" | base64 --decode > "$RUNNER_TEMP/key.p8"
+            xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+              --key "$RUNNER_TEMP/key.p8" \
+              --key-id "$APPLE_API_KEY_ID" \
+              --issuer "$APPLE_API_ISSUER" \
+              --wait
+            rm -f "$RUNNER_TEMP/key.p8"
+          else
+            xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+              --apple-id "$APPLE_ID" \
+              --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_PASSWORD" \
+              --wait
+          fi
+
+          # Stapling attaches the ticket to the bundle so it validates offline.
           xcrun stapler staple target/mdview.app
+          xcrun stapler validate target/mdview.app
 
       # A tarball rather than a zip because it preserves the bundle's symlinks
       # and permission bits. It does not dodge Gatekeeper: current macOS
@@ -136,6 +157,15 @@ jobs:
           ./target/release/mdview --version
           ./target/release/mdview --print-html README.md > /dev/null
           codesign --verify --strict --verbose=2 target/mdview.app
+
+      # If a certificate was configured, the result must actually clear
+      # Gatekeeper. Silently shipping an ad-hoc build under a release that
+      # claims to be signed would be worse than not signing at all.
+      - name: Assert Gatekeeper accepts the bundle
+        if: env.APPLE_SIGNING_IDENTITY != ''
+        run: |
+          codesign -dv --verbose=4 target/mdview.app 2>&1 | grep -E 'Authority|TeamIdentifier'
+          spctl --assess --type execute --verbose=4 target/mdview.app
 
       - uses: actions/upload-artifact@v4
         with:
