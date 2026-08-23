@@ -1,0 +1,56 @@
+[package]
+name = "mdview"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "A super lightweight cross-platform desktop viewer for Markdown (CommonMark + GFM) with Mermaid diagrams."
+authors = ["Ben Adrian Sarmiento"]
+license = "MIT"
+repository = "https://github.com/yowmamasita/mdview"
+readme = "README.md"
+keywords = ["markdown", "viewer", "commonmark", "gfm", "mermaid"]
+categories = ["command-line-utilities", "text-processing"]
+
+[lib]
+name = "mdview"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mdview"
+path = "src/main.rs"
+
+[features]
+default = ["gui", "mermaid"]
+# Native window + system webview. Disable for a headless build (`--print-html` only).
+gui = ["dep:wry", "dep:tao", "dep:muda", "dep:rfd", "dep:notify", "dep:open"]
+# Embed the Mermaid runtime so diagrams render with no network access.
+mermaid = []
+
+[dependencies]
+pulldown-cmark = { version = "0.13.4", default-features = false, features = ["html", "simd"] }
+ammonia = "4.1.4"
+percent-encoding = "2.3.2"
+pico-args = "0.5.0"
+
+wry = { version = "0.56.1", optional = true }
+tao = { version = "0.37.0", optional = true }
+# `libxdo` is off: it needs the xdo C library on Linux and only backs menu
+# items this application does not use there.
+muda = { version = "0.19.3", optional = true, default-features = false, features = ["gtk"] }
+# The XDG portal backend needs no C libraries at build time; rfd's Wayland
+# backend would pull in `wayland-sys`, which does.
+rfd = { version = "0.17.2", optional = true, default-features = false, features = ["xdg-portal", "common-controls-v6"] }
+notify = { version = "8.2.0", optional = true, default-features = false, features = ["macos_fsevent"] }
+open = { version = "5.4.1", optional = true }
+
+[dev-dependencies]
+serde_json = "1.0.151"
+
+# Tuned for a small binary. `panic = "abort"` is deliberately not set: the
+# platform webviews surface errors as unwinding panics, and a viewer should
+# report them rather than abort.
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+strip = true

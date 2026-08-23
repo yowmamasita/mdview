@@ -1,0 +1,446 @@
+/* mdview — document styles. Light and dark are driven by :root[data-theme]. */
+
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-subtle: #f6f8fa;
+  --bg-inset: #eff2f5;
+  --fg: #1f2328;
+  --fg-muted: #59636e;
+  --border: #d1d9e0;
+  --border-subtle: #e4e8ed;
+  --accent: #0969da;
+  --accent-muted: #ddf4ff;
+  --danger: #cf222e;
+  --success: #1a7f37;
+  --attention: #9a6700;
+  --done: #8250df;
+  --mark: #fff8c5;
+  --shadow: rgba(31, 35, 40, 0.08);
+  --font-body: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica,
+    Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", "JetBrains Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d1117;
+  --bg-subtle: #151b23;
+  --bg-inset: #010409;
+  --fg: #f0f6fc;
+  --fg-muted: #9198a1;
+  --border: #3d444d;
+  --border-subtle: #262c36;
+  --accent: #4493f8;
+  --accent-muted: #121d2f;
+  --danger: #f85149;
+  --success: #3fb950;
+  --attention: #d29922;
+  --done: #ab7df8;
+  --mark: #4b3f00;
+  --shadow: rgba(1, 4, 9, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 1.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-wrap: break-word;
+}
+
+.md-page {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 2.5rem 2rem 6rem;
+}
+
+/* ---------------------------------------------------------------- headings */
+
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4,
+.md-body h5,
+.md-body h6 {
+  margin: 1.75em 0 0.65em;
+  font-weight: 600;
+  line-height: 1.25;
+  scroll-margin-top: 1.5rem;
+}
+
+.md-body > :first-child {
+  margin-top: 0;
+}
+
+.md-body h1 {
+  font-size: 2em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.md-body h2 {
+  font-size: 1.5em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.md-body h3 {
+  font-size: 1.25em;
+}
+.md-body h4 {
+  font-size: 1em;
+}
+.md-body h5 {
+  font-size: 0.875em;
+}
+.md-body h6 {
+  font-size: 0.85em;
+  color: var(--fg-muted);
+}
+
+/* ------------------------------------------------------------ flow content */
+
+.md-body p,
+.md-body blockquote,
+.md-body ul,
+.md-body ol,
+.md-body dl,
+.md-body table,
+.md-body pre,
+.md-body details {
+  margin: 0 0 1rem;
+}
+
+.md-body a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.md-body a:hover {
+  text-decoration: underline;
+}
+
+.md-body strong {
+  font-weight: 600;
+}
+
+.md-body mark {
+  background: var(--mark);
+  color: inherit;
+}
+
+.md-body hr {
+  height: 1px;
+  margin: 2rem 0;
+  border: 0;
+  background: var(--border);
+}
+
+.md-body blockquote {
+  padding: 0 1em;
+  color: var(--fg-muted);
+  border-left: 0.25em solid var(--border);
+}
+
+.md-body blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.md-body ul,
+.md-body ol {
+  padding-left: 2em;
+}
+
+.md-body li + li {
+  margin-top: 0.25em;
+}
+
+.md-body li > ul,
+.md-body li > ol {
+  margin: 0.25em 0 0;
+}
+
+.md-body li.task-list-item {
+  list-style: none;
+  margin-left: -1.35em;
+}
+
+.md-body li.task-list-item > input[type="checkbox"] {
+  margin: 0 0.4em 0.15em -0.4em;
+  vertical-align: middle;
+}
+
+.md-body dt {
+  font-weight: 600;
+  margin-top: 1em;
+}
+
+.md-body dd {
+  margin-left: 2em;
+}
+
+.md-body img {
+  max-width: 100%;
+  height: auto;
+  background: var(--bg);
+}
+
+.md-body kbd {
+  display: inline-block;
+  padding: 0.2em 0.45em;
+  font: 0.85em var(--font-mono);
+  line-height: 1;
+  color: var(--fg);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+}
+
+.md-body abbr[title] {
+  text-decoration: underline dotted;
+  cursor: help;
+}
+
+/* -------------------------------------------------------------------- code */
+
+.md-body code,
+.md-body samp,
+.md-body var {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+
+.md-body :not(pre) > code {
+  padding: 0.2em 0.4em;
+  background: var(--bg-inset);
+  border-radius: 6px;
+  white-space: break-spaces;
+}
+
+.md-body pre {
+  padding: 1rem;
+  overflow-x: auto;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  line-height: 1.45;
+}
+
+.md-body pre > code {
+  padding: 0;
+  background: none;
+  white-space: pre;
+}
+
+/* ------------------------------------------------------------------ tables */
+
+.md-body .md-table-scroll {
+  overflow-x: auto;
+  margin: 0 0 1rem;
+}
+
+.md-body table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  margin: 0;
+  width: max-content;
+  max-width: 100%;
+}
+
+.md-body th,
+.md-body td {
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--border);
+}
+
+.md-body th {
+  background: var(--bg-subtle);
+  font-weight: 600;
+}
+
+.md-body tbody tr:nth-child(2n) {
+  background: var(--bg-subtle);
+}
+
+/* ---------------------------------------------------------------- footnotes */
+
+.md-body .footnote-definition {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.9em;
+  color: var(--fg-muted);
+}
+
+.md-body .footnote-definition > p {
+  margin: 0 0 0.5rem;
+}
+
+.md-body sup.footnote-reference a {
+  text-decoration: none;
+}
+
+/* ------------------------------------------------------------- GFM alerts */
+
+.md-body .markdown-alert {
+  padding: 0.5rem 1rem;
+  margin: 0 0 1rem;
+  border-left: 0.25em solid var(--border);
+  color: inherit;
+}
+
+.md-body .markdown-alert > :last-child {
+  margin-bottom: 0;
+}
+
+.md-body .markdown-alert-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.md-body .markdown-alert-note {
+  border-left-color: var(--accent);
+}
+.md-body .markdown-alert-note .markdown-alert-title {
+  color: var(--accent);
+}
+.md-body .markdown-alert-tip {
+  border-left-color: var(--success);
+}
+.md-body .markdown-alert-tip .markdown-alert-title {
+  color: var(--success);
+}
+.md-body .markdown-alert-important {
+  border-left-color: var(--done);
+}
+.md-body .markdown-alert-important .markdown-alert-title {
+  color: var(--done);
+}
+.md-body .markdown-alert-warning {
+  border-left-color: var(--attention);
+}
+.md-body .markdown-alert-warning .markdown-alert-title {
+  color: var(--attention);
+}
+.md-body .markdown-alert-caution {
+  border-left-color: var(--danger);
+}
+.md-body .markdown-alert-caution .markdown-alert-title {
+  color: var(--danger);
+}
+
+/* ----------------------------------------------------------------- mermaid */
+
+.md-body pre.mermaid {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow-x: auto;
+  /* Hidden until the runtime has swapped the source for an <svg>. */
+  visibility: hidden;
+}
+
+.md-body pre.mermaid[data-processed="true"] {
+  visibility: visible;
+}
+
+.md-body pre.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.md-body pre.mermaid[data-failed="true"] {
+  visibility: visible;
+  display: block;
+  white-space: pre;
+  color: var(--danger);
+  border-color: var(--danger);
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+
+/* ------------------------------------------------------------- empty state */
+
+.md-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+  text-align: center;
+  color: var(--fg-muted);
+}
+
+.md-empty h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.md-empty kbd {
+  font-family: var(--font-mono);
+  padding: 0.15em 0.4em;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+/* ---------------------------------------------------------------- toasts */
+
+.md-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: var(--fg);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 4px 16px var(--shadow);
+  opacity: 0;
+  transition: opacity 150ms ease;
+  pointer-events: none;
+}
+
+.md-toast[data-visible="true"] {
+  opacity: 1;
+}
+
+@media print {
+  .md-page {
+    max-width: none;
+    padding: 0;
+  }
+  .md-toast {
+    display: none;
+  }
+}
