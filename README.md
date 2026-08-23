@@ -199,12 +199,23 @@ a manual download:
 xattr -dr com.apple.quarantine /Applications/mdview.app
 ```
 
-The release workflow does upgrade itself automatically when the certificates
-exist. Set `APPLE_CERTIFICATE_P12`, `APPLE_CERTIFICATE_PASSWORD` and
-`APPLE_SIGNING_IDENTITY` as repository secrets and builds are signed with a
-Developer ID; add `APPLE_ID`, `APPLE_TEAM_ID` and `APPLE_APP_PASSWORD` and they
-are notarised and stapled too, at which point the warnings stop. Nothing needs
-to change in the workflow.
+The release workflow upgrades itself once the credentials exist — nothing in it
+needs changing:
+
+```sh
+scripts/setup-signing.sh ~/Downloads/AuthKey_XXXXXXXX.p8 <key-id> <issuer-id>
+```
+
+That exports the Developer ID certificate from your keychain and stores it, and
+the App Store Connect API key, as repository secrets. Tagged releases are then
+signed and notarised, and the warnings stop.
+
+The certificate has to be a **Developer ID Application** one. It is not the same
+as *Apple Development* (which signs builds for your own machines) or *Apple
+Distribution* (which signs App Store submissions) — neither of those can sign
+software distributed outside the App Store. Creating one costs nothing on an
+existing paid membership: Xcode → Settings → Accounts → your team → Manage
+Certificates → + → Developer ID Application.
 
 Building from source sidesteps the question entirely.
 
